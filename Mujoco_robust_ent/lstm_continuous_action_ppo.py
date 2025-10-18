@@ -31,7 +31,7 @@ def parse_args():
     parser.add_argument("--wandb_entity", default="TO_BE_FILLED", help="the entity (team) of wandb's project")
     parser.add_argument("--capture_video", type=bool, default=False, help="whether to capture videos of the agent performances (check out `videos` folder)")
     parser.add_argument("--save_model", type=bool, default=True, help="whether to save model into the `runs_new_reccurent/{run_name}` folder")
-    parser.add_argument("--save_dir", type=str, default="runs_puck_", help="the dir to save the model")
+    parser.add_argument("--save_dir", type=str, default="runs_puck", help="the dir to save the model")
     parser.add_argument("--upload_model", type=bool, default=False, help="whether to upload the saved model to huggingface")
     parser.add_argument("--hf_entity", default="", help="the user or org name of the model repository from the Hugging Face Hub")
     parser.add_argument("--env_id", default="CustomPusher-v1", help="the id of the environment")
@@ -312,7 +312,7 @@ if __name__ == "__main__":
                         writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
                         writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
                         writer.add_scalar("charts/goal_dist", info["reward_dist"], global_step)
-                        writer.add_scalar("charts/success", info["success"], global_step)
+
 
 
         # compute the state entropies:

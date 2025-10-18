@@ -33,12 +33,12 @@ def parse_args():
     parser.add_argument("--gamma", type=float, default=0.99, help="the discount factor gamma")
     parser.add_argument("--eval_steps", type=int, default=100, help="the number of steps to run in each environment per update")
     parser.add_argument("--env_id", default="CustomPusher-v1", help="the id of the environment")
-    parser.add_argument("--eval_episodes", type=int, default=200, help="the number of evaluation episodes")
-    parser.add_argument("--num_envs", type=int, default=20, help="the number of parallel game environments")
-    parser.add_argument("--ent_coef", type=float, default=0.01, help="coefficient of the entropy")
-    parser.add_argument("--beta", type=float, default=160.0, help="coefficient of the state entropy")
+    parser.add_argument("--eval_episodes", type=int, default=5, help="the number of evaluation episodes")
+    parser.add_argument("--num_envs", type=int, default=1, help="the number of parallel game environments")
+    parser.add_argument("--ent_coef", type=float, default=0.0, help="coefficient of the entropy")
+    parser.add_argument("--beta", type=float, default=0.0, help="coefficient of the state entropy")
     parser.add_argument("--starting_beta", type=float, default=800.0, help="coefficient of the state entropy warmup")
-    parser.add_argument("--test_seeds", type=list, default=[1], help="the evaluation seeds")
+    parser.add_argument("--test_seeds", type=list, default=[1,2,3,5,6,7,8,9,10,12,13,14,15,16,17,18,19,20], help="the evaluation seeds")
     parser.add_argument("--network_hidden_size", type=int, default=256, help="the size of the hidden layer in the network")
     parser.add_argument("--load_dir", type=str, default="runs_puck_final", help="The trained agent's directory")
     # to be filled in runtime
@@ -82,7 +82,9 @@ if __name__ == "__main__":
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = args.torch_deterministic
 
-    configs = [{"ent_coef": args.ent_coef, "beta": args.beta,"starting_beta": args.starting_beta}]
+    configs = [{"ent_coef": 0.0, "beta": 0.0,"starting_beta": 0.0},
+               {"ent_coef": 0.02, "beta": 0.0,"starting_beta": 0.0},
+               {"ent_coef": 0.01, "beta": 160.0,"starting_beta": 800.0}]
    
     
     df = pd.DataFrame(columns=['agent','seed' ,'reward','distance','wall','success'])
@@ -92,7 +94,7 @@ if __name__ == "__main__":
 
     args.reapets = args.eval_episodes // args.num_envs
   
-    for wall in [True,False]: #[0.1,0.3,0.5]     
+    for wall in [False,True]: #[0.1,0.3,0.5]     
         if wall:
             xml_file = os.path.join(os.path.dirname(__file__), "mujoco_local/custom_pusher_red_obstacle.xml")
         else:
@@ -104,7 +106,13 @@ if __name__ == "__main__":
         for seed in args.test_seeds:#2,
             for i, conf in tqdm(enumerate(configs)):
                     agent = Agent(envs).to(device)
-                    path = f"{args.load_dir}/CustomPusher-v1__{seed}__alpha_{conf['ent_coef']}_beta_{conf['beta']}_starting_beta_{conf['starting_beta']}"
+                    if conf['ent_coef'] == 0.0 and conf['beta'] == 0.0:
+                        path = f"{args.load_dir}/CustomPusher-v1__{seed}__alpha_{conf['ent_coef']}_beta_{conf['beta']}_grad_slow"
+                    elif conf['ent_coef'] == 0.01 and conf['beta'] == 0.0:
+                        path = f"{args.load_dir}/CustomPusher-v1__{seed}__alpha_{conf['ent_coef']}_beta_{conf['beta']}_puck"
+                    else:
+                        path = f"{args.load_dir}/CustomPusher-v1__{seed}__alpha_{conf['ent_coef']}_beta_{conf['beta']}_grad_semi_slow"
+                    # path ="/home/yonatanashlag/robust_ent/Mujoco_robust_ent/runs_puck_final/CustomPusher-v1__5__alpha_0.0_beta_0.0_grad_slow"
                     agent.load_state_dict(torch.load(f"{path}/agent.pth", weights_only=True))
                     normalize = np.load(f"{path}/agent_normalize.npz", allow_pickle=True)
                     norm_mean, norm_var = normalize["normalize_mean"].mean(), normalize["normalize_var"].mean()

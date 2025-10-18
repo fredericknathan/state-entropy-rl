@@ -25,7 +25,7 @@ def parse_args():
 
     # Algorithm specific argumentsObstaclePusher-v0#we did 100 eval steps
     parser.add_argument("--exp_name", default=os.path.basename(__file__)[: -len(".py")], help="the name of this experiment")
-    parser.add_argument("--seed", type=int, default=11, help="seed of the experiment")
+    parser.add_argument("--seed", type=int, default=2, help="seed of the experiment")
     parser.add_argument("--torch_deterministic", type=bool, default=True, help="if toggled, `torch.backends.cudnn.deterministic=False`")
     parser.add_argument("--cuda", type=bool, default=True, help="if toggled, cuda will be enabled by default")
     parser.add_argument("--track", type=bool, default=False, help="if toggled, this experiment will be tracked with Weights and Biases")
@@ -33,14 +33,14 @@ def parse_args():
     parser.add_argument("--gamma", type=float, default=0.99, help="the discount factor gamma")
     parser.add_argument("--eval_steps", type=int, default=100, help="the number of steps to run in each environment per update")
     parser.add_argument("--env_id", default="CustomPusher-v1", help="the id of the environment")
-    parser.add_argument("--eval_episodes", type=int, default=2, help="the number of evaluation episodes")
+    parser.add_argument("--eval_episodes", type=int, default=3, help="the number of evaluation episodes")
     parser.add_argument("--num_envs", type=int, default=1, help="the number of parallel game environments")
-    parser.add_argument("--ent_coef", type=float, default=0.01, help="coefficient of the entropy")
-    parser.add_argument("--beta", type=float, default=160.0, help="coefficient of the state entropy")
+    parser.add_argument("--ent_coef", type=float, default=0.0, help="coefficient of the entropy")
+    parser.add_argument("--beta", type=float, default=0.0, help="coefficient of the state entropy")
     parser.add_argument("--network_hidden_size", type=int, default=256, help="the size of the hidden layer in the network")
-    parser.add_argument("--functional_seed", type=int, default=219, help="the seed for the functional network")
+    parser.add_argument("--functional_seed", type=int, default=101, help="the seed for the functional network")
     parser.add_argument("--load_dir", type=str, default="runs_puck_final", help="The trained agent's directory")
-    parser.add_argument("--wall_perturbation", type=bool, default=False, help="whether to use wall perturbation")
+    parser.add_argument("--wall_perturbation", type=bool, default=True, help="whether to use wall perturbation")
     # to be filled in runtime  runs_puck_final/CustomPusher-v1__5__alpha_0.01_beta_170.0_puck/agent.pth
 
     args = parser.parse_args()
@@ -53,7 +53,7 @@ def make_env(env_id, idx, capture_video, run_name, gamma, control_cost=0,horizon
     def thunk():
         if capture_video and idx == 0:
             env = gym.make(env_id,reward_control_weight=control_cost, render_mode="rgb_array",xml_file=xml_file)
-            env = gym.wrappers.RecordVideo(env, f"videos/{run_name}", episode_trigger=lambda x: True)
+            env = gym.wrappers.RecordVideo(env, f"videos_new/{run_name}", episode_trigger=lambda x: True)
         else:
             env = gym.make(env_id,reward_control_weight=control_cost,xml_file=None)
         env=gym.wrappers.TimeLimit(env, max_episode_steps=horizon)
@@ -78,7 +78,7 @@ def normalize_obs(obs, mean, var):
 if __name__ == "__main__":
     args = parse_args()
     args.repeats = args.eval_episodes // args.num_envs
-    run_name = f"{args.env_id}__{args.functional_seed}__alpha_{args.ent_coef}__beta_{args.beta}_puck_wall"
+    run_name = f"{args.env_id}__{args.seed}__alpha_{args.ent_coef}__beta_{args.beta}_puck_{args.wall_perturbation}"
 
 
     # TRY NOT TO MODIFY: seeding
@@ -101,7 +101,8 @@ if __name__ == "__main__":
     )
 
     agent = Agent(envs).to(device)
-    path = f"runs_puck_final/CustomPusher-v1__{args.seed}__alpha_{args.ent_coef}_beta_{args.beta}_grad_slow"
+    # path = f"runs_puck_final/CustomPusher-v1__{args.seed}__alpha_{args.ent_coef}_beta_{args.beta}_grad_slow"
+    path =f"/home/yonatanashlag/robust_ent/Mujoco_robust_ent/runs_puck_final/CustomPusher-v1__{args.seed}__alpha_0.01_beta_160.0_grad_semi_slow"
     agent.load_state_dict(torch.load(f"{path}/agent.pth", weights_only=True))
     normalize = np.load(f"{path}/agent_normalize.npz", allow_pickle=True)
     norm_mean, norm_var = normalize["normalize_mean"].mean(), normalize["normalize_var"].mean()
@@ -109,9 +110,9 @@ if __name__ == "__main__":
   
     episode_returns = []
     for ep in range(args.eval_episodes):
-        envs = gym.vector.SyncVectorEnv(
-        [make_env(args.env_id, i, args.capture_video, run_name, args.gamma,horizon=args.eval_steps,xml_file=xml_file) for i in range(args.num_envs)]
-    )
+    #     envs = gym.vector.SyncVectorEnv(
+    #     [make_env(args.env_id, i, args.capture_video, run_name, args.gamma,horizon=args.eval_steps,xml_file=xml_file) for i in range(args.num_envs)]
+    # )
         obs, _ = envs.reset(seed=args.functional_seed)
         normed_obs = torch.Tensor(normalize_obs(obs, norm_mean, norm_var)).to(device)
         done = torch.zeros(args.num_envs).to(device)
@@ -131,8 +132,8 @@ if __name__ == "__main__":
             done = torch.Tensor(done).to(device)
             ep_return += reward.item()
 
-            if done.item():
-                envs.close()
-                break
+            
+    envs.close()
+                
 
-        episode_returns.append(ep_return)
+        # episode_returns.append(ep_return)
