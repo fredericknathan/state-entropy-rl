@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    # Algorithm specific argumentsObstaclePusher-v0#we did 100 eval steps
+    # Algorithm specific arguments
     parser.add_argument("--exp_name", default=os.path.basename(__file__)[: -len(".py")], help="the name of this experiment")
     parser.add_argument("--seed", type=int, default=2, help="seed of the experiment")
     parser.add_argument("--torch_deterministic", type=bool, default=True, help="if toggled, `torch.backends.cudnn.deterministic=False`")
@@ -40,8 +40,7 @@ def parse_args():
     parser.add_argument("--network_hidden_size", type=int, default=256, help="the size of the hidden layer in the network")
     parser.add_argument("--functional_seed", type=int, default=101, help="the seed for the functional network")
     parser.add_argument("--load_dir", type=str, default="runs_puck_final", help="The trained agent's directory")
-    parser.add_argument("--wall_perturbation", type=bool, default=True, help="whether to use wall perturbation")
-    # to be filled in runtime  runs_puck_final/CustomPusher-v1__5__alpha_0.01_beta_170.0_puck/agent.pth
+    parser.add_argument("--wall_perturbation", type=bool, default=True, help="whether to use wall)
 
     args = parser.parse_args()
     args.wandb_group_name = f"action_entropy_{args.ent_coef}__state_entropy_{args.beta}"
