@@ -38,7 +38,7 @@ def parse_args():
     parser.add_argument("--ent_coef", type=float, default=0.0, help="coefficient of the entropy")
     parser.add_argument("--beta", type=float, default=0.0, help="coefficient of the state entropy")
     parser.add_argument("--starting_beta", type=float, default=800.0, help="coefficient of the state entropy warmup")
-    parser.add_argument("--test_seeds", type=list, default=[1,2,3,5,6,7,8,9,10,12,13,14,15,16,17,18,19,20], help="the evaluation seeds")
+    parser.add_argument("--test_seeds", type=list, default=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25], help="the evaluation seeds")
     parser.add_argument("--network_hidden_size", type=int, default=256, help="the size of the hidden layer in the network")
     parser.add_argument("--load_dir", type=str, default="runs_puck_final", help="The trained agent's directory")
     # to be filled in runtime
