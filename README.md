@@ -1,7 +1,7 @@
 
 # State Entropy Regularization For Robust RL
 
-This repository is the official implementation of [State Entropy Regularization For Robust RL]. Accepted to nuerips 2025 (Oral).
+This repository is the official implementation of [State Entropy Regularization For Robust RL]. Accepted to Nuerips 2025 (Oral).
 
 ## Structure
 This repo contains two dirs: Minigrid_robust_ent ,Mujoco_robust_ent.
