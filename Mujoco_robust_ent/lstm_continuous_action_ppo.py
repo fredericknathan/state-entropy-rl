@@ -54,7 +54,7 @@ def parse_args():
     parser.add_argument("--ent_coef", type=float, default=0.0, help="coefficient of the entropy")
     parser.add_argument("--beta", type=float, default=0.0, help="coefficient of the state entropy")
     parser.add_argument("--ent_coef_decay", type=bool, default=False, help="decay rate of the action entropy")
-    parser.add_argument("--beta_decay", type=float, default=0.91, help="decay rate of the state entropy")
+    parser.add_argument("--beta_discount", type=float, default=0.91, help="decay rate of the state entropy")
     parser.add_argument("--starting_beta",type=float, default=0.0,help="starting beta value for warmup" )
     parser.add_argument("--network_hidden_size", type=int, default=256, help="the size of the hidden layer in the network")
     # to be filled in runtime
@@ -255,7 +255,7 @@ if __name__ == "__main__":
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
     values = torch.zeros((args.num_steps, args.num_envs)).to(device)
     unnormed_obs = torch.zeros((args.num_steps, args.num_envs) + envs.single_observation_space.shape).to(device)
-    discount =utils.discount(args.beta_decay,rewards.shape).to(device)
+    discount =utils.discount(args.beta_discount,rewards.shape).to(device)
     beta = args.starting_beta
     ent_coef = args.ent_coef
     # TRY NOT TO MODIFY: start the game

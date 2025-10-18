@@ -1,20 +1,8 @@
 #!/bin/bash
-
-# configs=(
-#   "beta=0.01 entropy_coef=0.01"
-#   "beta=0.03 entropy_coef=0.01"
-#   "beta=0.05 entropy_coef=0.01"
-#   "beta=0.07 entropy_coef=0.01"
-#   "beta=0.1 entropy_coef=0.01"
-#   "beta=0.02 entropy_coef=0.02"
-#   "beta=0 entropy_coef=0.01"
-#   "beta=0 entropy_coef=0.02"
-#   "beta=0 entropy_coef=0.03"
-#   "beta=0 entropy_coef=0.04"
-#   "beta=0 entropy_coef=0"
-# )
 configs=(
   "beta=0.07 entropy_coef=0.01 ent_coef_decay=False"
+  "beta=0.0 entropy_coef=0.01 ent_coef_decay=False"
+  "beta=0.0 entropy_coef=0.0 ent_coef_decay=False"
 
 )
 
@@ -37,6 +25,4 @@ for config in "${configs[@]}"; do
     fi
   done
 done
-
-wait
 

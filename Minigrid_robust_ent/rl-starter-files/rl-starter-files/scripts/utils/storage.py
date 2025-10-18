@@ -3,7 +3,7 @@ import os
 import torch
 import logging
 import sys
-
+from pathlib import Path
 import utils
 
 
@@ -16,7 +16,8 @@ def create_folders_if_necessary(path):
 def get_storage_dir():
     if "RL_STORAGE" in os.environ:
         return os.environ["RL_STORAGE"]
-    return "/home/yonatanashlag/RobustEnt/VCSE/VCSE_A2C/rl-starter-files/rl-starter-files/scripts/STORAGE_NEW"
+    storage = Path(__file__).parent / "STORAGE_NEW"
+    return str(storage.resolve())
 #_NEW
 
 def get_model_dir(model_name):
@@ -67,4 +68,5 @@ def get_csv_logger(model_dir):
     utils.create_folders_if_necessary(csv_path)
     csv_file = open(csv_path, "a")
     return csv_file, csv.writer(csv_file)
+
 
