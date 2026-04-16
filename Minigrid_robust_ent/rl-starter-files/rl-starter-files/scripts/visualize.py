@@ -4,8 +4,10 @@ import numpy
 import torch
 
 import utils
-
-import csv
+import sys
+sys.path.append('rl-starter-files/rl-starter-files/scripts/utils')
+# import custom_env
+# import csv
 
 
 # Parse arguments
@@ -85,31 +87,7 @@ for episode in range(args.episodes):
         if done: # or env.window.closed:
             break
         
-    image = numpy.array(frames)
-    # if env.window.closed:
-    #     break
-
-    # with open('visitations.csv', 'w', newline='') as csvfile:
-    #     writer = csv.writer(csvfile, delimiter=' ',
-    #                             quotechar='|', quoting=csv.QUOTE_MINIMAL)
-    #     for elem in agent_pos_visits:
-    #         writer.writerow([elem, agent_pos_visits[elem]])
-    with open('environment.csv', 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile, delimiter=' ',
-                                quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        pic = frames[0].transpose(1, 2, 0)
-        for i in range(pic.shape[0]):
-            for j in range(pic.shape[1]):
-                writer.writerow(pic[i][j])
-
-from PIL import Image
-pic = frames[0].transpose(1, 2, 0)
-image = numpy.array(pic)
-img = Image.new(mode='RGB', size=(pic.shape[1], pic.shape[0]), color=0x0000FF)
-pix=img.load()
-for i in range(pic.shape[1]):
-    for j in range(pic.shape[0]):
-        pix[i,j]=(pic[j][i][0],pic[j][i][1],pic[j][i][2])
-img.save('./image/'+args.env+'.png', format='PNG')
-
-
+    if args.gif and len(frames) > 0:
+        print("Saving gif... ", end="")
+        write_gif(frames, args.gif, fps=1/args.pause)
+        print("Done.")
