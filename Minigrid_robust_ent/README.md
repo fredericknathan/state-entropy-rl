@@ -48,16 +48,34 @@ pip install wandb
 ```
 ## Reproducing our main results
 
-```
+### Tutorial: Running Experiments
+To train and evaluate the agents, navigate to the project directory and run the A2C execution script:
+
+```bash
 cd State_entropy_robust_rl/Minigrid_robust_ent
 bash run_a2c.sh
 ```
+
 This script trains and evaluates three variants:
+1. **No regularization** (Baseline, $\beta=0.0$)
+2. **Policy-entropy regularization**
+3. **State-entropy regularization** (Novelty-Seeker, $\beta=0.07$)
 
-No regularization
+If you are logged in to Weights & Biases (`wandb login`), all metrics and plots will be uploaded automatically.
 
-Policy-entropy regularization
+## Results Showcase (Seed 1)
 
-State-entropy regularization
+### Visual Performance (Deterministic)
+The following visualizations show the agents' performance using deterministic action selection (`--argmax`) on Seed 1.
 
-If you are logged in to Weights & Biases (wandb login), all metrics and plots will be uploaded automatically.
+| Novelty-Seeking ($\beta=0.07$) | Baseline ($\beta=0.0$) |
+| :---: | :---: |
+| ![Novelty Agent](seed1_beta0.07_argmax.gif) | ![Baseline Agent](seed1_beta0.0_argmax.gif) |
+
+### Training Metrics
+Final performance metrics after 3.0M frames of training (Mean value over parallel environments):
+
+| Variant | Mean Return | Mean Frames per Episode |
+| :--- | :---: | :---: |
+| **Novelty ($\beta=0.07$)** | **0.655** | **36.5** |
+| Baseline ($\beta=0.0$) | 0.545 | 50.5 |
