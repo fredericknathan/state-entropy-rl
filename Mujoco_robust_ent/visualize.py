@@ -100,8 +100,7 @@ if __name__ == "__main__":
     )
 
     agent = Agent(envs).to(device)
-    # path = f"runs_puck_final/CustomPusher-v1__{args.seed}__alpha_{args.ent_coef}_beta_{args.beta}_grad_slow"
-    path =f"/home/yonatanashlag/robust_ent/Mujoco_robust_ent/runs_puck_final/CustomPusher-v1__{args.seed}__alpha_0.01_beta_160.0_grad_semi_slow"
+    path = f"{args.load_dir}/CustomPusher-v1__{args.seed}__alpha_{args.ent_coef}_beta_{args.beta}_grad_slow"
     agent.load_state_dict(torch.load(f"{path}/agent.pth", weights_only=True))
     normalize = np.load(f"{path}/agent_normalize.npz", allow_pickle=True)
     norm_mean, norm_var = normalize["normalize_mean"].mean(), normalize["normalize_var"].mean()

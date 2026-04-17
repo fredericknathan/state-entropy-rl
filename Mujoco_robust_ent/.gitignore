@@ -10,14 +10,11 @@ venv/
 *.log
 wandb/
 #Ignore saved models
-pusher_puck/
 runs_puck_alpha/
 runs_puck_alpha_decay/
 runs_puck_final/
 runs_reccurent/
 figs/
-vidoes/
 models/
 figures/
 ant_beta_200.0_alpha_0.001_starting_beta_0.0/
-videos_new/

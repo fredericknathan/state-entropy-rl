@@ -40,7 +40,8 @@ def parse_args():
     parser.add_argument("--starting_beta", type=float, default=800.0, help="coefficient of the state entropy warmup")
     parser.add_argument("--test_seeds", type=list, default=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25], help="the evaluation seeds")
     parser.add_argument("--network_hidden_size", type=int, default=256, help="the size of the hidden layer in the network")
-    parser.add_argument("--load_dir", type=str, default="runs_puck_final", help="The trained agent's directory")
+    parser.add_argument("--model_path", type=str, required=True, help="The trained agent's model directory path")
+    parser.add_argument("--output", type=str, default="pusher_radius_alpha_more.csv", help="Output CSV file name")
     # to be filled in runtime
 
     args = parser.parse_args()
@@ -82,93 +83,108 @@ if __name__ == "__main__":
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = args.torch_deterministic
 
-    configs = [{"ent_coef": 0.0, "beta": 0.0,"starting_beta": 0.0},
-               {"ent_coef": 0.02, "beta": 0.0,"starting_beta": 0.0},
-               {"ent_coef": 0.01, "beta": 160.0,"starting_beta": 800.0}]
     xml_file = os.path.join(os.path.dirname(__file__), "mujoco_local/pusher_v5.xml")
-   
-    
+
     df = pd.DataFrame(columns=['agent','seed' ,'reward','distance','radius','success'])
 
     
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
     args.reapets = args.eval_episodes // args.num_envs
-  
-    for radius in [0.15]: 
 
-            
-        envs = gym.vector.SyncVectorEnv(
-                        [make_env(args.env_id, i, run_name, args.gamma, xml_file=xml_file,horizon=args.eval_steps,success_truncation=True,radius=radius) for i in range(args.num_envs)]
+    # Calculate total iterations for progress bar
+    total_iterations = len([0.15]) * len(args.test_seeds) * args.repeats
+    total_steps = total_iterations * args.eval_steps
+
+    print(f"Starting evaluation:")
+    print(f"  - Seeds: {len(args.test_seeds)}")
+    print(f"  - Episodes per seed: {args.repeats}")
+    print(f"  - Steps per episode: {args.eval_steps}")
+    print(f"  - Total episodes: {total_iterations}")
+    print(f"  - Total steps: {total_steps:,}")
+    print(f"  - Parallel environments: {args.num_envs}")
+    print()
+
+    with tqdm(total=total_iterations, desc="Evaluating") as pbar:
+        for radius_idx, radius in enumerate([0.15]):
+            pbar.set_description(f"Testing radius={radius}")
+
+            envs = gym.vector.SyncVectorEnv(
+                            [make_env(args.env_id, i, run_name, args.gamma, xml_file=xml_file,horizon=args.eval_steps,success_truncation=True,radius=radius) for i in range(args.num_envs)]
+                        )
+
+            # Load model once per radius configuration (not per seed)
+            agent = Agent(envs).to(device)
+            agent.load_state_dict(torch.load(f"{args.model_path}/agent.pth", weights_only=True))
+            normalize = np.load(f"{args.model_path}/agent_normalize.npz", allow_pickle=True)
+            norm_mean, norm_var = normalize["normalize_mean"].mean(), normalize["normalize_var"].mean()
+
+            for seed_idx, seed in enumerate(args.test_seeds):
+                episode_rewards = []
+                episode_distances = []
+                episode_successes = []
+                for k in range(args.repeats):
+                    obss, _ = envs.reset(seed=args.seed+k)
+                    obss = torch.Tensor(normalize_obs(obss, norm_mean, norm_var)).to(device)
+                    next_lstm_state = (
+                        torch.zeros(agent.lstm.num_layers, args.num_envs, agent.lstm.hidden_size).to(device),
+                        torch.zeros(agent.lstm.num_layers, args.num_envs, agent.lstm.hidden_size).to(device),
                     )
-        for seed in args.test_seeds:#2,
-            for i, conf in tqdm(enumerate(configs)):
-                    agent = Agent(envs).to(device)
-                    if conf['beta'] == 0.0:
-                        path = f"{args.load_dir}/CustomPusher-v1__{seed}__alpha_{conf['ent_coef']}_beta_{conf['beta']}_grad_slow"
-                    else:
-                        path = f"{args.load_dir}/CustomPusher-v1__{seed}__alpha_{conf['ent_coef']}_beta_{conf['beta']}_grad_semi_slow"
-                    # path ="/home/yonatanashlag/robust_ent/Mujoco_robust_ent/runs_puck_final/CustomPusher-v1__5__alpha_0.0_beta_0.0_grad_slow"
-                    agent.load_state_dict(torch.load(f"{path}/agent.pth", weights_only=True))
-                    normalize = np.load(f"{path}/agent_normalize.npz", allow_pickle=True)
-                    norm_mean, norm_var = normalize["normalize_mean"].mean(), normalize["normalize_var"].mean()
+                    dones = torch.zeros(args.num_envs, device=device)
+                    step = 0
+                    cumulative_rewards = torch.zeros(args.num_envs, device=device)
+                    final_distances = torch.zeros(args.num_envs, device=device)
+                    successes = torch.zeros(args.num_envs, device=device)
+                    mask = torch.ones(args.num_envs, device=device)
+                    while step < args.eval_steps:
+                        with torch.no_grad():
+                            actions, logprob, _, value, next_lstm_state = agent.get_action_and_value(obss, next_lstm_state, dones)
 
-                    episode_rewards = []
-                    episode_distances = []
-                    episode_successes = []
-                    for k in range(args.repeats):
-                        obss, _ = envs.reset(seed=args.seed+k)
+                        obss, rewards, dones, truncations, infos = envs.step(actions.cpu().numpy())
                         obss = torch.Tensor(normalize_obs(obss, norm_mean, norm_var)).to(device)
-                        next_lstm_state = (
-                            torch.zeros(agent.lstm.num_layers, args.num_envs, agent.lstm.hidden_size).to(device),
-                            torch.zeros(agent.lstm.num_layers, args.num_envs, agent.lstm.hidden_size).to(device),
-                        ) 
-                        dones = torch.zeros(args.num_envs, device=device)
-                        step = 0
-                        cumulative_rewards = torch.zeros(args.num_envs, device=device)
-                        final_distances = torch.zeros(args.num_envs, device=device)
-                        successes = torch.zeros(args.num_envs, device=device)
-                        mask = torch.ones(args.num_envs, device=device)
-                        while step < args.eval_steps:
-                            with torch.no_grad():
-                                actions, logprob, _, value, next_lstm_state = agent.get_action_and_value(obss, next_lstm_state, dones)
+                        dones = torch.Tensor(dones).to(device)
+                        rewards = torch.Tensor(rewards).to(device)
 
-                            obss, rewards, dones, truncations, infos = envs.step(actions.cpu().numpy())
-                            obss = torch.Tensor(normalize_obs(obss, norm_mean, norm_var)).to(device)
-                            dones = torch.Tensor(dones).to(device)
-                            rewards = torch.Tensor(rewards).to(device)
+                        cumulative_rewards += rewards * mask
 
-                            cumulative_rewards += rewards * mask
-
-                            for idx, done in enumerate(dones):
-                                if done or truncations[idx]:
-                                    mask[idx] = 0
-                                    if 'final_info' in infos:
-                                        final_distances[idx] = infos['final_info'][idx]['reward_dist']
-                                        successes[idx] = infos['final_info'][idx]['success']
-                                    else:
-                                        final_distances[idx] = infos['reward_dist'][idx]
-                                        successes[idx] = infos['success'][idx]
-                                
-
-                            step += 1
-
-                        episode_rewards.append(cumulative_rewards.mean().item())
-                        episode_distances.append(final_distances.mean().item())
-                        episode_successes.append(successes.mean().item())
+                        for idx, done in enumerate(dones):
+                            if done or truncations[idx]:
+                                mask[idx] = 0
+                                if 'final_info' in infos:
+                                    final_distances[idx] = infos['final_info'][idx]['reward_dist']
+                                    successes[idx] = infos['final_info'][idx]['success']
+                                else:
+                                    final_distances[idx] = infos['reward_dist'][idx]
+                                    successes[idx] = infos['success'][idx]
 
 
-                    avg_reward = np.mean(episode_rewards)
-                    avg_distance = np.mean(episode_distances)
-                    avg_success = np.mean(episode_successes)
-                    df.loc[len(df)] = [f"beta:{conf['beta']}_alpha:{conf['ent_coef']}", seed, avg_reward, avg_distance,radius,avg_success]
+                        step += 1
+
+                    # End of one episode - record results and update progress
+                    episode_rewards.append(cumulative_rewards.mean().item())
+                    episode_distances.append(final_distances.mean().item())
+                    episode_successes.append(successes.mean().item())
+
+                    # Update progress bar
+                    pbar.update(1)
+                    episodes_completed = (radius_idx * len(args.test_seeds) * args.repeats +
+                                         seed_idx * args.repeats + (k + 1))
+                    steps_completed = episodes_completed * args.eval_steps
+                    pbar.set_postfix({'seed': seed, 'radius': radius,
+                                     'episodes': f'{episodes_completed}/{total_iterations}',
+                                     'steps': f'{steps_completed:,}/{total_steps:,}'})
+
+                # End of all episodes for this seed - compute averages and save to CSV
+                avg_reward = np.mean(episode_rewards)
+                avg_distance = np.mean(episode_distances)
+                avg_success = np.mean(episode_successes)
+                model_name = os.path.basename(args.model_path)
+                df.loc[len(df)] = [model_name, seed, avg_reward, avg_distance, radius, avg_success]
 
 
-    df.to_csv('pusher_radius_alpha_more.csv', index=False)
-   
-    #print average success rate for radius and no radius:
-    radius_success = df[df['radius'] == True]['success'].mean()
-    no_radius_success = df[df['radius'] == False]['success'].mean()
-    print(f"Agent:alpha_{conf['ent_coef']}_beta_{conf['beta']}_starting_beta_{conf['starting_beta']}")
-    print(f"Average success rate with radius: {radius_success}")
-    print(f"Average success rate nominal Environment: {no_radius_success}")
+    df.to_csv(args.output, index=False)
+
+    # Calculate and print average success rate
+    avg_success_rate = df['success'].mean()
+    print(f"Model: {args.model_path}")
+    print(f"Average success rate across all evaluations: {avg_success_rate:.4f}")
