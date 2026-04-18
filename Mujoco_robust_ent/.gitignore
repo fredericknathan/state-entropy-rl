@@ -18,3 +18,9 @@ figs/
 models/
 figures/
 ant_beta_200.0_alpha_0.001_starting_beta_0.0/
+# Is this their experiment configurations?
+runs_ant_scan/
+videos_ant/
+ant_runs/
+run_param_scan.*
+ant_hurdels_*

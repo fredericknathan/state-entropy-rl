@@ -42,7 +42,8 @@ def parse_args():
     parser.add_argument("--test_seeds", type=list, default=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25], help="the evaluation seeds")
     parser.add_argument("--network_hidden_size", type=int, default=256, help="the size of the hidden layer in the network")
     parser.add_argument("--healthy_reward", type=float, default=0.0, help="the reward for being healthy in the environment")
-    parser.add_argument("--load_dir", type=str, default="runs_puck_final", help="The trained agent's directory")
+    parser.add_argument("--model_path", type=str, required=True, help="The trained agent's model directory path")
+    parser.add_argument("--output", type=str, default="ant_hurdels_results.csv", help="Output CSV file name")
     # to be filled in runtime
 
     args = parser.parse_args()
@@ -56,9 +57,16 @@ def count_hurdles(x_pos):
     # count how many edges the final x crosses
     return sum([1 for edge in hurdle_edges if x_pos > edge])
 
-def make_env(env_id, idx, run_name, gamma,horizon=300,xml_file=None,healthy_reward=0.0):
+def make_env(env_id, idx, run_name, gamma,horizon=300,xml_file=None,healthy_reward=0.0,exclude_current_positions_from_observation=False):
     def thunk():
-        env = gym.make(env_id,xml_file=xml_file,healthy_reward=healthy_reward)
+        # Build kwargs dynamically, only include xml_file if it's not None
+        kwargs = {
+            "healthy_reward": healthy_reward,
+            "exclude_current_positions_from_observation": exclude_current_positions_from_observation
+        }
+        if xml_file is not None:
+            kwargs["xml_file"] = xml_file
+        env = gym.make(env_id, **kwargs)
         env=gym.wrappers.TimeLimit(env, max_episode_steps=horizon)
         env = gym.wrappers.FlattenObservation(env)  # deal with dm_control's Dict observation space
         env = gym.wrappers.RecordEpisodeStatistics(env)
@@ -67,8 +75,8 @@ def make_env(env_id, idx, run_name, gamma,horizon=300,xml_file=None,healthy_rewa
         # env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10))
         # env = NormalizeReward(env, gamma=gamma)
         # env = gym.wrappers.TransformReward(env, lambda reward: np.clip(reward, -10, 10))
-       
-        
+
+
         return env
 
     return thunk
@@ -82,42 +90,53 @@ if __name__ == "__main__":
     args = parse_args()
     args.repeats = args.eval_episodes // args.num_envs
     run_name = f"{args.env_id}__{args.seed}__alpha_{args.ent_coef}__beta_{args.beta}"
- 
+
     # TRY NOT TO MODIFY: seeding
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = args.torch_deterministic
 
-    configs = [{"beta": 200.0, "ent_coef": 0.001,"starting_beta": 0.0},
-               {"beta": 0.0, "ent_coef": 0.0,"starting_beta": 0.0},
-               {"beta": 0.0, "ent_coef": 0.001,"starting_beta": 0.0}]
-   
-    
     df = pd.DataFrame(columns=['agent','seed' ,'reward','distance','hurdels_passed', 'hurdels'])
 
-    
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
     args.reapets = args.eval_episodes // args.num_envs
-  
-    for hurdels in [True,False]:      
-        if hurdels:
-            xml_file = os.path.join(os.path.dirname(__file__), "mujoco_local/ant_stairs.xml")
-        else:
-            xml_file = os.path.join(os.path.dirname(__file__), "mujoco_local/ant.xml")
 
-        envs = gym.vector.SyncVectorEnv(
-                        [make_env(args.env_id, i, run_name, args.gamma, xml_file=xml_file,horizon=args.eval_steps,healthy_reward=args.healthy_reward) for i in range(args.num_envs)]
-                    )
-        for seed in args.test_seeds:#2,
-            for i, conf in tqdm(enumerate(configs)):
-                agent = Agent(envs).to(device)
-                path = f"ant_all_reward/ant_beta_{conf['beta']}_alpha_{conf['ent_coef']}_starting_beta_{conf['starting_beta']}/ANT-v1__{seed}__alpha_{conf['ent_coef']}_beta_{conf['beta']}_starting_beta_{conf['starting_beta']}"
-                agent.load_state_dict(torch.load(f"{path}/agent.pth", weights_only=True))
-                normalize = np.load(f"{path}/agent_normalize.npz", allow_pickle=True)
-                norm_mean, norm_var = normalize["normalize_mean"].mean(), normalize["normalize_var"].mean()
+    # Calculate total iterations for progress bar
+    total_iterations = len([True, False]) * len(args.test_seeds) * args.repeats
+    total_steps = total_iterations * args.eval_steps
 
+    print(f"Starting evaluation:")
+    print(f"  - Seeds: {len(args.test_seeds)}")
+    print(f"  - Episodes per seed: {args.repeats}")
+    print(f"  - Steps per episode: {args.eval_steps}")
+    print(f"  - Total episodes: {total_iterations}")
+    print(f"  - Total steps: {total_steps:,}")
+    print(f"  - Parallel environments: {args.num_envs}")
+    print()
+
+    with tqdm(total=total_iterations, desc="Evaluating") as pbar:
+        for hurdle_idx, hurdles in enumerate([True, False]):
+            hurdle_desc = "with hurdles" if hurdles else "without hurdles"
+            pbar.set_description(f"Testing {hurdle_desc}")
+
+            if hurdles:
+                xml_file = os.path.join(os.path.dirname(__file__), "mujoco_local/ant_stairs.xml")
+            else:
+                xml_file = None  # Use Gymnasium's default ant.xml
+
+            envs = gym.vector.SyncVectorEnv(
+                            [make_env(args.env_id, i, run_name, args.gamma, xml_file=xml_file,horizon=args.eval_steps,healthy_reward=args.healthy_reward,exclude_current_positions_from_observation=False) for i in range(args.num_envs)]
+                        )
+
+            # Load model once per hurdle configuration (not per seed)
+            agent = Agent(envs).to(device)
+            agent.load_state_dict(torch.load(f"{args.model_path}/agent.pth", weights_only=True))
+            normalize = np.load(f"{args.model_path}/agent_normalize.npz", allow_pickle=True)
+            norm_mean, norm_var = normalize["normalize_mean"].mean(), normalize["normalize_var"].mean()
+
+            for seed_idx, seed in enumerate(args.test_seeds):
                 episode_rewards = []
                 episode_distances = []
                 episode_successes = []
@@ -128,7 +147,7 @@ if __name__ == "__main__":
                     next_lstm_state = (
                         torch.zeros(agent.lstm.num_layers, args.num_envs, agent.lstm.hidden_size).to(device),
                         torch.zeros(agent.lstm.num_layers, args.num_envs, agent.lstm.hidden_size).to(device),
-                    ) 
+                    )
                     dones = torch.zeros(args.num_envs, device=device)
                     step = 0
                     cumulative_rewards = torch.zeros(args.num_envs, device=device)
@@ -156,22 +175,39 @@ if __name__ == "__main__":
                                     final_distances[idx] = infos['x_position'][idx]
 
                                 final_hurdles[idx] = count_hurdles(final_distances[idx])
-                            
+
 
                         step += 1
 
+                    # End of one episode - record results and update progress
                     episode_rewards.append(cumulative_rewards.mean().item())
                     episode_hurdles.append(final_hurdles.mean().item())
                     episode_distances.append(final_distances.mean().item())
                     episode_successes.append(successes.mean().item())
 
+                    # Update progress bar
+                    pbar.update(1)
+                    episodes_completed = (hurdle_idx * len(args.test_seeds) * args.repeats +
+                                         seed_idx * args.repeats + (k + 1))
+                    steps_completed = episodes_completed * args.eval_steps
+                    pbar.set_postfix({'seed': seed, 'hurdles': hurdle_desc,
+                                     'episodes': f'{episodes_completed}/{total_iterations}',
+                                     'steps': f'{steps_completed:,}/{total_steps:,}'})
 
+                # End of all episodes for this seed - compute averages and save to CSV
                 avg_hurdles = np.mean(episode_hurdles)
                 avg_reward = np.mean(episode_rewards)
                 avg_distance = np.mean(episode_distances)
                 avg_success = np.mean(episode_successes)
-                df.loc[len(df)] = [f"beta:{conf['beta']}_alpha:{conf['ent_coef']}_starting_beta{conf['starting_beta']}", seed, avg_reward, avg_distance, avg_hurdles, hurdels]
+                model_name = os.path.basename(args.model_path)
+                df.loc[len(df)] = [model_name, seed, avg_reward, avg_distance, avg_hurdles, hurdles]
 
+    df.to_csv(args.output, index=False)
 
-    df.to_csv('ant_all_rewards_hurdels_hard_25.csv', index=False)
+    # Calculate and print average results
+    avg_hurdles_with = df[df['hurdels'] == True]['hurdels_passed'].mean()
+    avg_hurdles_without = df[df['hurdels'] == False]['hurdels_passed'].mean()
+    print(f"Model: {args.model_path}")
+    print(f"Average hurdles passed (with hurdles): {avg_hurdles_with:.4f}")
+    print(f"Average hurdles passed (without hurdles): {avg_hurdles_without:.4f}")
    

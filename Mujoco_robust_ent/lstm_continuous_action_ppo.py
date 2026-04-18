@@ -68,11 +68,15 @@ def parse_args():
 
 def make_env(env_id, idx, capture_video, run_name, gamma, control_cost=0,horizon=100):
     def thunk():
-        if capture_video and idx == 0:
-            env = gym.make(env_id,reward_control_weight=control_cost, render_mode="rgb_array")
-            env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
+        is_ant = "ANT" in env_id.upper()
+        gym_kwargs = {"render_mode": "rgb_array"} if (capture_video and idx == 0) else {}
+        if is_ant:
+            gym_kwargs["exclude_current_positions_from_observation"] = False
         else:
-            env = gym.make(env_id,reward_control_weight=control_cost)
+            gym_kwargs["reward_control_weight"] = control_cost
+        env = gym.make(env_id, **gym_kwargs)
+        if capture_video and idx == 0:
+            env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
         env=gym.wrappers.TimeLimit(env, max_episode_steps=horizon)
         env = gym.wrappers.FlattenObservation(env)  # deal with dm_control's Dict observation space
         env = gym.wrappers.RecordEpisodeStatistics(env)
@@ -311,16 +315,18 @@ if __name__ == "__main__":
                         print(f"global_step={global_step}, episodic_return={info['episode']['r']}")
                         writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
                         writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
-                        writer.add_scalar("charts/goal_dist", info["reward_dist"], global_step)
+                        if "reward_dist" in info:
+                            writer.add_scalar("charts/goal_dist", info["reward_dist"], global_step)
 
 
 
         # compute the state entropies:
-        puck_pos = unnormed_obs[:, :, 17:19]
+        is_ant_env = "ANT" in args.env_id.upper()
+        state_feats = unnormed_obs[:, :, 0:2] if is_ant_env else unnormed_obs[:, :, 17:19]
         state_entropies = torch.zeros((args.num_steps, args.num_envs)).to(device)
         #looping over the envs to save memory, it bearly affects compute time
         for i in range(args.num_envs):
-            state_entropy = utils.compute_state_entropy(src_feats=puck_pos[:,i],tgt_feats=puck_pos,batch=True,calc_steps=10)
+            state_entropy = utils.compute_state_entropy(src_feats=state_feats[:,i],tgt_feats=state_feats,batch=True,calc_steps=10)
             state_entropies[:,i] = state_entropy
         
 
