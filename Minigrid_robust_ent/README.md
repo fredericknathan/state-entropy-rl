@@ -68,7 +68,7 @@ If you are logged in to Weights & Biases (`wandb login`), all metrics and plots 
 ### Visual Performance (Deterministic)
 The following visualizations show the agents' performance using deterministic action selection (`--argmax`) on Seed 1.
 
-| Novelty-Seeking ($\beta=0.07$) | Baseline ($\beta=0.0$) |
+| State-Entropy ($\beta=0.07, \alpha=0.01$) | Baseline ($\beta=0, \alpha=0$) |
 | :---: | :---: |
 | ![Novelty Agent](seed1_beta0.07_argmax.gif) | ![Baseline Agent](seed1_beta0.0_argmax.gif) |
 
@@ -77,5 +77,6 @@ Final performance metrics after 3.0M frames of training (Mean value over paralle
 
 | Variant | Mean Return | Mean Frames per Episode |
 | :--- | :---: | :---: |
-| **Novelty ($\beta=0.07$)** | **0.655** | **36.5** |
-| Baseline ($\beta=0.0$) | 0.545 | 50.5 |
+| **State-Entropy ($\beta=0.07, \alpha=0.01$)** | **0.655** | **36.5** |
+| Policy Entropy ($\beta=0, \alpha=0.01$) | 0.545 | 50.5 |
+| Baseline ($\beta=0, \alpha=0$) | 0.62 | 40 |
