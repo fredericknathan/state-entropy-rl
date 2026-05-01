@@ -73,7 +73,7 @@ The following visualizations show the agents' performance using deterministic ac
 | ![State Entropy Agent](seed1_state_entropy_argmax.gif) | ![Policy Entropy Agent](seed1_policy_entropy_argmax.gif) | ![Baseline Agent](seed1_baseline_argmax.gif) |
 
 ### Training Metrics
-Final performance metrics after 3.0M frames of training (Mean value over parallel environments):
+Final performance metrics after 1.0M frames of training (Mean value over parallel environments):
 
 | Variant | Mean Return | Mean Frames per Episode |
 | :--- | :---: | :---: |
